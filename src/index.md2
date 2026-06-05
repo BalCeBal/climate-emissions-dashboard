@@ -1,0 +1,120 @@
+---
+title: Global Climate & Emissions Analytics
+theme: dashboard
+---
+
+<style>
+  /* REQUIRED: Leaflet CSS prevents the map from collapsing into a black void */
+  @import url("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
+</style>
+
+```js
+import * as d3 from "npm:d3";
+import { createMap } from "./components/map.js";
+import { renderSpiral } from "./components/spiral.js";
+import { createEmissionChart, renderDualAxisChart } from "./components/charts.js";
+
+// Load Data
+const annualData = await FileAttachment("./data/dashboard_annual_data.csv").csv({typed: true});
+const monthlyData = await FileAttachment("./data/dashboard_monthly_data.csv").csv({typed: true});
+const countriesGeo = await FileAttachment("./data/countries.json").json();
+const countryToContinent = new Map(countriesGeo.features.map(f => [f.id, f.properties.continentCode]));
+
+// 1. DOM Elements & State Setup
+const scrubberUI = Inputs.range([0, (2013 - 1900) * 12 + 11], { step: 1, value: 0, label: "Timeline (Months)", width: 900 });
+const spiralContainer = d3.create("svg").attr("viewBox", "0 0 600 600").style("background-color", "#0d1b2a").node();
+const dualAxisContainer = d3.create("svg").attr("viewBox", "0 0 928 350").style("background-color", "#0d1b2a").node();
+
+let currentLevel = "Global";
+let currentLoc = "GLB";
+
+// 2. Initialize Components
+const mapBaseObj = createMap(countriesGeo, countryToContinent, (loc, contCode) => {
+    if (currentLevel === "Global") {
+        currentLevel = "Continent";
+        currentLoc = contCode;
+    } else if (currentLevel === "Continent") {
+        if (contCode === currentLoc) {
+            currentLevel = "Country";
+            currentLoc = loc;
+        } else {
+            currentLoc = contCode;
+        }
+    } else if (currentLevel === "Country") {
+        const activeContinent = countryToContinent.get(currentLoc);
+        if (contCode === activeContinent) {
+            if (loc !== currentLoc) { currentLoc = loc; } 
+            else { currentLevel = "Continent"; currentLoc = activeContinent; }
+        } else { currentLevel = "Continent"; currentLoc = contCode; }
+    }
+    updateDashboard(); // Standard JS trigger
+});
+const mapContainer = mapBaseObj.element;
+
+const emissionChartObj = createEmissionChart(annualData, countryToContinent, (newLevel, newLoc) => {
+    currentLevel = newLevel;
+    currentLoc = newLoc;
+    updateDashboard(); // Standard JS trigger
+});
+const emissionContainer = emissionChartObj.element;
+
+// 3. The Master Render Engine (Standard JS Function)
+function updateDashboard() {
+    const tIndex = scrubberUI.value;
+    const year = Math.floor(tIndex / 12) + 1900;
+    const month = (tIndex % 12) + 1;
+
+    // A. Update Map
+    const continentRows = annualData.filter(d => d.Year === year && d.Level === "Continent");
+    const contMap = new Map(continentRows.map(d => [d.ISO_Code, d.Temp_Anomaly]));
+    const countryRows = annualData.filter(d => d.Year === year && d.Level === "Country");
+    const countryMap = new Map(countryRows.map(d => [d.ISO_Code, d.Temp_Anomaly]));
+    const colorScale = d3.scaleSequential([2, -2], d3.interpolateRdYlBu);
+
+    mapBaseObj.geoLayer.setStyle(feature => {
+        const cCode = feature.id;
+        const contCode = countryToContinent.get(cCode);
+        let fillColor = "#1e293b", fillOpacity = 0.3, strokeColor = "#334155", weight = 0.5;
+
+        if (currentLevel === "Global") {
+            const val = contMap.get(contCode);
+            if (val !== undefined) { fillColor = colorScale(val); fillOpacity = 0.6; strokeColor = fillColor; }
+        } else if (currentLevel === "Continent") {
+            if (contCode === currentLoc) {
+                const val = countryMap.get(cCode);
+                if (val !== undefined) { fillColor = colorScale(val); fillOpacity = 0.7; strokeColor = fillColor; }
+            } else {
+                const val = contMap.get(contCode);
+                if (val !== undefined) { strokeColor = colorScale(val); weight = 1.2; }
+            }
+        } else if (currentLevel === "Country") {
+            if (cCode === currentLoc) {
+                const val = countryMap.get(cCode);
+                if (val !== undefined) { fillColor = colorScale(val); fillOpacity = 0.8; strokeColor = "#ffffff"; weight = 1.5; }
+            } else {
+                const val = countryMap.get(cCode);
+                if (val !== undefined) { strokeColor = colorScale(val); weight = 1.2; }
+            }
+        }
+        return { fillColor, color: strokeColor, weight, fillOpacity };
+    });
+
+    const globalRow = annualData.find(d => d.Year === year && d.Level === "Global");
+    const valText = currentLevel === "Global" ? (globalRow ? `${globalRow.Temp_Anomaly.toFixed(2)} °C` : "No Data") :
+                    currentLevel === "Continent" ? (contMap.has(currentLoc) ? `${contMap.get(currentLoc).toFixed(2)} °C` : "No Data") :
+                    (countryMap.has(currentLoc) ? `${countryMap.get(currentLoc).toFixed(2)} °C` : "No Data");
+
+    mapBaseObj.dynamicLabel.html(`
+      <div style="font-size: 20px; font-weight: bold; text-shadow: 0px 2px 4px rgba(0,0,0,0.8);">${currentLoc === "GLB" ? "Global Average" : currentLoc}</div>
+      <div style="font-size: 16px; font-weight: bold; margin-top: 4px; text-shadow: 0px 2px 4px rgba(0,0,0,0.8);">${valText}</div>
+    `);
+
+    // B. Update Charts
+    emissionChartObj.update(year, currentLevel, currentLoc);
+    renderSpiral(spiralContainer, monthlyData, year, month, currentLoc, currentLevel);
+    renderDualAxisChart(dualAxisContainer, annualData, year, currentLevel, currentLoc);
+}
+
+// 4. Connect Slider & Trigger Initial Paint
+scrubberUI.addEventListener("input", updateDashboard);
+updateDashboard();
