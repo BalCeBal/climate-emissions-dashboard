@@ -77,15 +77,23 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
     .text("🖱️ Scroll Wheel : Free Zoom");
 
   const legendDiv = d3.select(container).append("div")
+    .attr("class", "map-legend")
     .style("position", "absolute")
-    .style("bottom", "15%")
-    .style("right", "2%")
+    .style("right", "12px")
+    .style("bottom", "12px")
     .style("z-index", "1000")
-    .style("pointer-events", "none");
+    .style("pointer-events", "none")
+    .style("width", "140px")
+    .style("height", "48px")
+    .style("overflow", "visible")
+    .style("box-sizing", "border-box");
 
   const legSvg = legendDiv.append("svg")
-    .attr("width", 150)
-    .attr("height", 52);
+    .attr("viewBox", "0 0 150 52")
+    .attr("preserveAspectRatio", "xMaxYMax meet")
+    .style("width", "140px")
+    .style("height", "48px")
+    .style("display", "block");
 
   const gradientId = `temp-gradient-${Math.random().toString(36).slice(2)}`;
 

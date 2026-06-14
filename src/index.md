@@ -7,13 +7,8 @@ theme: dashboard
 @import url("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
 
 /* ── Global ── */
-body {
+body, html {
   background: #161616;
-}
-
-#observablehq-toc,
-#observablehq-footer {
-  display: none !important;
 }
 
 /* ── Title ── */
@@ -27,6 +22,7 @@ h1 {
 }
 
 /* ── Observable main layout ── */
+
 #observablehq-main {
   display: flex;
   flex-direction: column;
@@ -235,6 +231,18 @@ h1 {
   border-radius: 6px;
   padding: 0.5rem;
   font-family: consolas, monospace;
+}
+
+.dashboard-footer {
+  width: 40%;
+  box-sizing: border-box;
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.75rem 0.25rem 0.75rem;
+  border-top: 1px solid #334155;
+  color: #94a3b8;
+  font-family: consolas, monospace;
+  font-size: 12px;
+  text-align: center;
 }
 
 @media (min-width: calc(832px + 5rem)) {
@@ -876,6 +884,10 @@ ${chartObj.element}
 
 <div id="hierarchy-card" class="card hierarchy-card">
 ${hierarchyPanel}
+</div>
+
+<div class="dashboard-footer">
+Data source: Berkeley Earth
 </div>
 
 </div>
