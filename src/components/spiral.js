@@ -1,128 +1,306 @@
 // src/components/spiral.js
 import * as d3 from "d3";
 
-export function renderSpiral(svgElement, monthlyData, currentYear, currentMonth, currentLoc, currentLevel) {
+export function renderSpiral(
+  svgElement,
+  monthlyData,
+  currentYear,
+  currentMonth,
+  currentLoc,
+  currentLevel,
+  useAbsolute = false
+) {
   const svg = d3.select(svgElement);
-  
-  // Clear out the previous frame's geometry to redrawing fresh chronological steps
+  svg.style("font-family", "consolas");
   svg.selectAll("*").remove();
 
-  const width = 600;
+  const width = 928;
   const height = 600;
-  const center = [width / 2, height / 2];
+  const titleX = 16;
+  const titleY = 24;
 
-  if (!monthlyData || monthlyData.length === 0) {
-    svg.append("text")
-      .attr("x", center[0])
-      .attr("y", center[1])
-      .attr("fill", "#ffffff")
-      .attr("text-anchor", "middle")
-      .text("Loading monthly data...");
-    return;
-  }
+  const center = [width / 2, height / 2 + 18];
 
-  // 1. Filter and chronologically sort all tracking coordinates
-  const filteredData = monthlyData.filter(d => 
-    d.Level === currentLevel && (d.Location_Name === currentLoc || d.ISO_Code === currentLoc)
+  if (!monthlyData || monthlyData.length === 0) return;
+
+  const monthNames = [
+    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+  ];
+
+  // 1. Filter and sort data for the selected scope
+  const filteredData = monthlyData.filter(d =>
+    d.Level === currentLevel &&
+    (d.Location_Name === currentLoc || d.ISO_Code === currentLoc)
   );
 
-  const sortedData = filteredData.map(d => ({
-    Year: +d.Year, Month: +d.Month, Temp_Anomaly: +d.Temp_Anomaly
-  })).sort((a, b) => a.Year - b.Year || a.Month - b.Month);
+  // Pick the value field based on mode
+  const valueField = useAbsolute ? "AverageTemperature" : "Temp_Anomaly";
 
-  // 2. Slice the dataset up to the exact active time index slider position
-  const maxIndex = sortedData.findIndex(d => d.Year === currentYear && d.Month === currentMonth);
-  const dataToDraw = maxIndex !== -1 ? sortedData.slice(0, maxIndex + 1) : sortedData;
+  const sortedData = filteredData
+    .map(d => ({
+      Year: +d.Year,
+      Month: +d.Month,
+      Temp_Anomaly: +d.Temp_Anomaly,
+      AverageTemperature: +d.AverageTemperature,
+      value: useAbsolute ? +d.AverageTemperature : +d.Temp_Anomaly
+    }))
+    .filter(d => !isNaN(d.Year) && !isNaN(d.Month) && !isNaN(d.value))
+    .sort((a, b) => a.Year - b.Year || a.Month - b.Month);
 
-  // 3. Group datasets by year and attach the cross-year loop connector
-  const years = d3.group(dataToDraw, d => d.Year);
+  if (sortedData.length === 0) return;
+
+  // 2. Slice data up to the active year-month
+  const maxIndex = sortedData.findIndex(
+    d => d.Year === currentYear && d.Month === currentMonth
+  );
+
+  const dataToDraw =
+    maxIndex !== -1 ? sortedData.slice(0, maxIndex + 1) : sortedData;
+
+  // 3. Group by year and add January bridge for wrap-around
   const yearGroups = [];
 
-  for (const [year, yearData] of years) {
-      const plotData = yearData.map(d => ({ ...d, PlotMonth: d.Month }));
+  for (const [year, yearData] of d3.group(dataToDraw, d => d.Year)) {
+    const plotData = yearData.map(d => ({
+      ...d,
+      PlotMonth: d.Month
+    }));
 
-      // Search the FULL sorted array for the upcoming January data point to bridge the wrap-around gap
-      const nextJan = sortedData.find(d => d.Year === year + 1 && d.Month === 1);
-      
-      if (nextJan && (year < currentYear || (year === currentYear && currentMonth === 12))) {
-          plotData.push({ ...nextJan, PlotMonth: 13 });
-      }
-      
-      yearGroups.push({ year, plotData });
+    const nextJan = sortedData.find(
+      d => d.Year === year + 1 && d.Month === 1
+    );
+
+    if (
+      nextJan &&
+      (year < currentYear || (year === currentYear && currentMonth === 12))
+    ) {
+      plotData.push({
+        ...nextJan,
+        PlotMonth: 13
+      });
+    }
+
+    yearGroups.push({ year, plotData });
   }
 
-  // 4. Set up geographic radius and custom temperature color scales
-  const angleScale = d3.scaleLinear().domain([1, 13]).range([0, 2 * Math.PI]);
-  const radiusScale = d3.scaleLinear().domain([-1.5, 2.0]).range([80, 260]); 
-  const colorScale = d3.scaleSequential([2, -2], d3.interpolateRdYlBu);
+  // 4. Scales — adapt to mode
+  const values = sortedData.map(d => d.value).filter(v => !isNaN(v));
+  const minData = d3.min(values) ?? -1.5;
+  const maxData = d3.max(values) ?? 2.0;
+
+  let radiusScale, colorScale, tickValues;
+
+  if (useAbsolute) {
+    const mean = d3.mean(values);
+    const std = d3.deviation(values) || 1;
+
+    // Centre on mean, spread by ±2 standard deviations
+    // This ensures seasonal variation always fills the spiral
+    // even when the absolute range is narrow at global level
+    radiusScale = d3.scaleLinear()
+      .domain([mean - 2 * std, mean + 2 * std])
+      .range([80, 260]);
+
+    colorScale = d3.scaleSequential(
+      [mean + 2 * std, mean - 2 * std],
+      d3.interpolateRdYlBu
+    );
+
+    tickValues = d3.ticks(mean - 2 * std, mean + 2 * std, 4);
+
+  } else {
+    // Anomaly mode: symmetric around zero
+    const absMax = Math.max(Math.abs(minData), Math.abs(maxData), 0.1);
+    radiusScale = d3.scaleLinear()
+      .domain([-absMax, absMax])
+      .range([75, 235]);
+
+    colorScale = d3.scaleSequential(
+      [absMax, -absMax],
+      d3.interpolateRdYlBu
+    );
+
+    tickValues = [-absMax, -absMax / 2, 0, absMax / 2, absMax];
+  }
+
+  const angleScale = d3.scaleLinear()
+    .domain([1, 13])
+    .range([0, 2 * Math.PI]);
 
   const g = svg.append("g");
 
-  // 5. Build crisp white baseline reference rings (-1°C, 0°C, +1°C, +2°C)
-  const thresholds = [-1, 0, 1, 2];
-  thresholds.forEach(t => {
+  // Title — matches charts.js style exactly
+  const contNames = { GLB: "Global", EUR: "Europe", ASI: "Asia", AFR: "Africa", AME: "Americas", OCE: "Oceania" };
+  const locationLabel = currentLevel === "Global"
+    ? "Global"
+    : currentLevel === "Continent"
+      ? (contNames[currentLoc] || currentLoc)
+      : (filteredData[0]?.Location_Name || currentLoc);
+  const modeLabel = useAbsolute ? "Absolute Temperature" : "Temperature Anomaly";
+
+  const titleGroup = svg.append("g")
+    .attr("class", "spiral-title")
+    .attr("transform", `translate(${titleX}, ${titleY})`);
+
+  titleGroup.append("text")
+    .attr("x", 0)
+    .attr("y", 0)
+    .attr("text-anchor", "start")
+    .attr("dominant-baseline", "hanging")
+    .attr("fill", "#ffffff")
+    .attr("font-size", "32px")
+    .attr("font-weight", "bold")
+    .style("paint-order", "stroke")
+    .style("stroke", "#000000")
+    .style("stroke-width", 2)
+    .text(`${locationLabel}: Hawkins Spiral`);
+
+  titleGroup.append("text")
+    .attr("x", 0)
+    .attr("y", 36)
+    .attr("text-anchor", "start")
+    .attr("dominant-baseline", "hanging")
+    .attr("fill", "#94a3b8")
+    .attr("font-size", "24px")
+    .attr("font-weight", "bold")
+    .text(modeLabel);
+
+  /*svg.append("text")
+    .attr("x", 16)
+    .attr("y", 28)
+    .attr("fill", "#ffffff")
+    .attr("font-size", "18px")
+    .attr("font-weight", "bold")
+    .style("paint-order", "stroke")
+    .style("stroke", "#000000")
+    .style("stroke-width", 2)
+    .text(`${locationLabel} Hawkins Spiral`);
+
+  svg.append("text")
+    .attr("x", 16)
+    .attr("y", 46)
+    .attr("fill", "#94a3b8")
+    .attr("font-size", "13px")
+    .attr("font-weight", "bold")
+    .text(modeLabel);*/
+
+  // 5. Reference rings
+  tickValues.forEach(t => {
     const r = radiusScale(t);
-    const circleColor = "#ffffff"; 
-    
+    if (r < 0) return; // skip if out of range
+    const isZero = Math.abs(t) < 1e-9;
+
     g.append("circle")
-      .attr("cx", center[0]).attr("cy", center[1]).attr("r", r)
+      .attr("cx", center[0])
+      .attr("cy", center[1])
+      .attr("r", r)
       .attr("fill", "none")
-      .attr("stroke", circleColor)
-      .attr("stroke-width", 1.5) 
-      .attr("opacity", 0.4);    
+      .attr("stroke", "#ffffff")
+      .attr("stroke-width", isZero ? 2.5 : 1.5)
+      .attr("opacity", isZero ? 0.8 : 0.4);
+
+    const label = useAbsolute
+      ? `${t.toFixed(1)}°C`
+      : `${t > 0 ? "+" : ""}${t.toFixed(1)}°C`;
 
     g.append("text")
-      .attr("x", center[0]).attr("y", center[1] - r - 6)
-      .attr("fill", circleColor).attr("font-size", "11px").attr("text-anchor", "middle").attr("font-weight", "bold")
-      .text(`${t > 0 ? '+' : ''}${t}°C`);
+      .attr("x", center[0])
+      .attr("y", center[1] - r - 6)
+      .attr("fill", "#ffffff")
+      .attr("font-size", "13px")
+      .attr("text-anchor", "middle")
+      .attr("font-weight", "bold")
+      .style("paint-order", "stroke")
+      .style("stroke", "#000000")
+      .style("stroke-width", 1)
+      .text(label);
+
+    // ADD: bottom label (mirror position)
+    g.append("text")
+      .attr("x", center[0])
+      .attr("y", center[1] + r + 16)
+      .attr("fill", "#ffffff")
+      .attr("font-size", "13px")
+      .attr("text-anchor", "middle")
+      .attr("font-weight", "bold")
+      .style("paint-order", "stroke")
+      .style("stroke", "#000000")
+      .style("stroke-width", 1)
+      .text(label);
   });
 
-  // 6. Draw circular calendar month indicators
-  const monthsNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-  monthsNames.forEach((month, i) => {
+  // 6. Month labels around the spiral
+  monthNames.forEach((m, i) => {
     const angle = (i / 12) * (2 * Math.PI) - Math.PI / 2;
-    const labelRadius = 280; 
+
     g.append("text")
-      .attr("x", center[0] + labelRadius * Math.cos(angle)).attr("y", center[1] + labelRadius * Math.sin(angle) + 4)
-      .attr("fill", "#94a3b8").attr("font-size", "12px").attr("font-weight", "bold").attr("text-anchor", "middle")
-      .text(month);
+      .attr("x", center[0] + 255 * Math.cos(angle))
+      .attr("y", center[1] + 255 * Math.sin(angle) + 4)
+      .attr("fill", "#94a3b8")
+      .attr("font-size", "14px")
+      .attr("font-weight", "bold")
+      .attr("text-anchor", "middle")
+      .text(m);
   });
 
-  // 7. Render persistent HUD readouts inside the center core
+  // 7. Center watermark-style year
   g.append("text")
-    .attr("x", center[0]).attr("y", center[1] - 5)
-    .attr("fill", "#ffffff").attr("font-size", "36px").attr("font-weight", "bold").attr("text-anchor", "middle")
+    .attr("x", center[0])
+    .attr("y", center[1] + 40)
+    .attr("fill", "#ffffff")
+    .attr("font-size", "120px")
+    .attr("font-weight", "900")
+    .attr("opacity", 0.16)
+    .attr("text-anchor", "middle")
+    .style("paint-order", "stroke")
+    .style("stroke", "#000000")
+    .style("stroke-width", 2)
+    .style("pointer-events", "none")
     .text(currentYear);
-    
-  g.append("text")
-    .attr("x", center[0]).attr("y", center[1] + 15)
-    .attr("fill", "#94a3b8").attr("font-size", "14px").attr("font-weight", "bold").attr("text-anchor", "middle")
-    .text(monthsNames[currentMonth - 1]);
 
-  // 8. Generate smooth radial coordinate line definitions
+  // 8. Month counter watermark
+  g.append("text")
+    .attr("x", center[0])
+    .attr("y", center[1] + 80)
+    .attr("fill", "#ffffff")
+    .attr("font-size", "24px")
+    .attr("font-weight", "900")
+    .attr("opacity", 0.4)
+    .attr("text-anchor", "middle")
+    .style("paint-order", "stroke")
+    .style("stroke", "#000000")
+    .style("stroke-width", 2)
+    .style("pointer-events", "none")
+    .text(monthNames[currentMonth - 1]);
+
+  // 9. Radial line generator — uses d.value
   const lineRadial = d3.lineRadial()
     .angle(d => angleScale(d.PlotMonth))
-    .radius(d => radiusScale(d.Temp_Anomaly))
-    .defined(d => d.Temp_Anomaly !== undefined && !isNaN(d.Temp_Anomaly)) 
-    .curve(d3.curveCatmullRom.alpha(0.5)); 
+    .radius(d => radiusScale(d.value))
+    .defined(d => d.value !== undefined && !isNaN(d.value))
+    .curve(d3.curveCatmullRom.alpha(0.5));
 
-  // 9. Separate layers to keep past historical tracks locked beneath the active tracking year
-  const pastGroup = g.append("g").attr("transform", `translate(${center[0]}, ${center[1]})`);
-  const activeGroup = g.append("g").attr("transform", `translate(${center[0]}, ${center[1]})`);
-  
+  // 10. Layers
+  const pastGroup = g.append("g")
+    .attr("transform", `translate(${center[0]}, ${center[1]})`);
+
+  const activeGroup = g.append("g")
+    .attr("transform", `translate(${center[0]}, ${center[1]})`);
+
   for (const group of yearGroups) {
-      const isCurrentYear = group.year === currentYear;
-      const targetGroup = isCurrentYear ? activeGroup : pastGroup;
+    const isCurrentYear = group.year === currentYear;
+    const targetGroup = isCurrentYear ? activeGroup : pastGroup;
 
-      targetGroup.append("path")
-        .datum(group.plotData)
-        .attr("fill", "none")
-        .attr("stroke", d => {
-            const avg = d3.mean(group.plotData, m => m.Temp_Anomaly);
-            return colorScale(avg);
-        })
-        .attr("stroke-width", isCurrentYear ? 2.5 : 1.5) 
-        .attr("opacity", isCurrentYear ? 1.0 : 0.2) 
-        .attr("d", lineRadial);
+    targetGroup.append("path")
+      .datum(group.plotData)
+      .attr("fill", "none")
+      .attr("stroke", () => {
+        const avg = d3.mean(group.plotData.filter(m => m.PlotMonth <= 12), m => m.value);
+        return colorScale(avg);
+      })
+      .attr("stroke-width", isCurrentYear ? 2.5 : 1.5)
+      .attr("opacity", isCurrentYear ? 0.9 : 0.35)
+      .attr("d", lineRadial);
   }
 }

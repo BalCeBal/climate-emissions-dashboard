@@ -37,45 +37,49 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
     .style("pointer-events", "none")
     .style("text-align", "center")
     .style("color", "#ffffff")
-    .style("font-family", "sans-serif");
+    .style("font-family", "consolas");
 
   const manual = d3.select(container).append("div")
     .style("position", "absolute")
-    .style("top", "24px")
-    .style("left", "24px")
+    .style("top", "2%")
+    .style("left", "2%")
     .style("z-index", "1000")
     .style("pointer-events", "none")
-    .style("font-family", "sans-serif");
+    .style("font-family", "consolas");
 
   manual.append("div")
     .style("font-size", "13px")
     .style("font-weight", "800")
     .style("color", "#ffffff")
     .style("letter-spacing", "0.5px")
-    .text("NAVIGATION GUIDE");
+    .style("text-shadow", "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000")
+    .text("Navigation Guide");
 
   manual.append("div")
     .style("font-size", "11px")
     .style("color", "#cbd5e1")
     .style("margin-top", "6px")
-    .text("🖱️ Left Click : Drill Down / Select Adjacent");
+    .style("text-shadow", "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000")
+    .text("🖱️ Left Click : Drill Down");
 
   manual.append("div")
     .style("font-size", "11px")
     .style("color", "#cbd5e1")
     .style("margin-top", "3px")
+    .style("text-shadow", "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000")
     .text("🖱️ Right Click : Drill Up");
 
   manual.append("div")
     .style("font-size", "11px")
     .style("color", "#cbd5e1")
     .style("margin-top", "3px")
+    .style("text-shadow", "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000")
     .text("🖱️ Scroll Wheel : Free Zoom");
 
   const legendDiv = d3.select(container).append("div")
     .style("position", "absolute")
-    .style("bottom", "24px")
-    .style("right", "24px")
+    .style("bottom", "15%")
+    .style("right", "2%")
     .style("z-index", "1000")
     .style("pointer-events", "none");
 
@@ -104,8 +108,12 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
     .attr("font-weight", "800")
     .attr("fill", "#ffffff")
     .attr("text-anchor", "middle")
-    .style("font-family", "sans-serif")
-    .text("TEMPERATURE ANOMALY");
+    .style("font-family", "consolas")
+    .style("paint-order", "stroke")
+    .style("stroke", "#000000")
+    .style("stroke-width", "3px")
+    .style("stroke-linejoin", "round")
+    .text("Temperature Anomaly");
 
   legSvg.append("rect")
     .attr("x", 5)
@@ -121,8 +129,12 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
     .attr("font-size", "10px")
     .attr("font-weight", "700")
     .attr("fill", "#cbd5e1")
-    .style("font-family", "sans-serif")
-    .text("+2°C");
+    .style("font-family", "consolas")
+    .text("+2°C")
+    .style("paint-order", "stroke")
+    .style("stroke", "#000000")
+    .style("stroke-width", "2px")
+    .style("stroke-linejoin", "round");
 
   legSvg.append("text")
     .attr("x", 75)
@@ -131,8 +143,12 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
     .attr("font-weight", "700")
     .attr("fill", "#cbd5e1")
     .attr("text-anchor", "middle")
-    .style("font-family", "sans-serif")
-    .text("0°C");
+    .style("font-family", "consolas")
+    .text("0°C")
+    .style("paint-order", "stroke")
+    .style("stroke", "#000000")
+    .style("stroke-width", "2px")
+    .style("stroke-linejoin", "round");
 
   legSvg.append("text")
     .attr("x", 145)
@@ -141,8 +157,12 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
     .attr("font-weight", "700")
     .attr("fill", "#cbd5e1")
     .attr("text-anchor", "end")
-    .style("font-family", "sans-serif")
-    .text("-2°C");
+    .style("font-family", "consolas")
+    .text("-2°C")
+    .style("paint-order", "stroke")
+    .style("stroke", "#000000")
+    .style("stroke-width", "2px")
+    .style("stroke-linejoin", "round");
 
   const geoLayer = L.geoJSON(countriesGeo, {
     bubblingMouseEvents: false,

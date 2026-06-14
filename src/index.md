@@ -6,16 +6,50 @@ theme: dashboard
 <style>
 @import url("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
 
+/* ── Global ── */
+body {
+  background: #161616;
+}
+
+#observablehq-toc,
+#observablehq-footer {
+  display: none !important;
+}
+
+/* ── Title ── */
 h1 {
-  text-align: center;
-  width: 100%;
-  margin: 0 0 0.5rem 0;
-  font-size: 2rem;
+  white-space: nowrap;
+  font-family: consolas, monospace;
+  font-size: clamp(1rem, 2vw, 2rem);
   font-weight: 800;
   color: #f8fafc;
   letter-spacing: 0.02em;
 }
 
+/* ── Observable main layout ── */
+#observablehq-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 1rem;
+  box-sizing: border-box;
+  gap: 0.5rem;
+}
+
+#observablehq-main > h1 {
+  text-align: center;
+  width: 100%;
+}
+
+/* Slider card and grid share identical width */
+#observablehq-main > .card,
+#observablehq-main > .dashboard-grid,
+#observablehq-main > .observablehq--block {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Timeline ── */
 .dashboard-slider {
   padding: 1rem;
 }
@@ -29,10 +63,10 @@ h1 {
 
 .timeline-button {
   flex-shrink: 0;
-
   border: 0;
   border-radius: 999px;
   padding: 0.65rem 1rem;
+  font-family: consolas, monospace;
   font-weight: 700;
   cursor: pointer;
   background: #1e293b;
@@ -49,9 +83,11 @@ h1 {
   flex-shrink: 0;
   min-width: 60px;
   text-align: right;
+  font-family: consolas, monospace;
   font-weight: 800;
 }
 
+/* ── Dashboard grid ── */
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;
@@ -59,14 +95,16 @@ h1 {
   gap: 0.5rem;
 }
 
+/* ── Cards ── */
 .card {
-  border: 1px solid #232933 !important;
-  box-shadow: none !important;
+  border: 1px solid #4f5d6e !important;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.08) !important;
   background: #161b22 !important;
   border-radius: 8px !important;
   padding: 0.5rem !important;
-  margin: 1 !important;
+  margin: 0 !important;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .card svg {
@@ -95,8 +133,201 @@ h1 {
   }
 }
 
-body {
-  background: #101418;
+/* ── Visual cards & maximize ── */
+.visual-card {
+  position: relative;
+}
+
+.maximize-button {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 9999;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #e5e7eb;
+  background: rgba(2, 6, 23, 0.92);
+  color: #ffffff;
+  border-radius: 8px;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+.maximize-button:hover {
+  background: #f8fafc;
+  color: #020617;
+  border-color: #ffffff;
+}
+
+/* ── Hierarchy card for maximized non-map visuals ── */
+.hierarchy-card {
+  display: none;
+}
+
+.dashboard-grid.maximized.with-hierarchy {
+  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-rows: auto;
+}
+
+.dashboard-grid.maximized.with-hierarchy .hierarchy-card {
+  display: block;
+  height: calc(100vh - 170px);
+}
+
+.hierarchy-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-family: consolas, monospace;
+  color: #f8fafc;
+}
+
+.hierarchy-title {
+  font-size: 16px;
+  font-weight: 900;
+  margin-bottom: 0.25rem;
+}
+
+.hierarchy-subtitle {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 0.5rem;
+}
+
+.hierarchy-section {
+  border-top: 1px solid #334155;
+  padding-top: 0.75rem;
+}
+
+.hierarchy-button {
+  width: 100%;
+  border: 1px solid #475569;
+  background: #1e293b;
+  color: #f8fafc;
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin-bottom: 0.4rem;
+  font-family: consolas, monospace;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+
+.hierarchy-button:hover,
+.hierarchy-button.active {
+  background: #f8fafc;
+  color: #020617;
+  border-color: #ffffff;
+}
+
+.hierarchy-select {
+  width: 100%;
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 0.5rem;
+  font-family: consolas, monospace;
+}
+
+@media (min-width: calc(832px + 5rem)) {
+    #observablehq-toc ~ #observablehq-main
+Specificity: (2,0,0)
+ {
+        padding-right: 0px;
+    }
+}
+
+@media (max-width: 1000px) {
+  .dashboard-grid.maximized.with-hierarchy {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-grid.maximized.with-hierarchy .hierarchy-card {
+    height: auto;
+  }
+}
+
+.spiral-mode-button {
+  position: absolute;
+  top: 0.6rem;
+  right: 3.5rem;
+  z-index: 9999;
+  height: 38px;
+  padding: 0 0.6rem;
+  border: 1px solid #e5e7eb;
+  background: rgba(2, 6, 23, 0.92);
+  color: #ffffff;
+  border-radius: 8px;
+  font-family: consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+.spiral-mode-button:hover {
+  background: #f8fafc;
+  color: #020617;
+  border-color: #ffffff;
+}
+
+.dashboard-grid.maximized {
+  grid-template-columns: 1fr;
+}
+
+.dashboard-grid.maximized .visual-card {
+  display: none;
+}
+
+.dashboard-grid.maximized .visual-card.is-maximized {
+  display: block;
+  height: calc(100vh - 170px);
+}
+
+.dashboard-grid.maximized .visual-card.is-maximized svg,
+.dashboard-grid.maximized .visual-card.is-maximized .leaflet-map-container {
+  height: 100% !important;
+}
+
+/* ── Year watermark ── */
+.year-watermark {
+  display: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+.visual-card:not(.is-maximized) .year-watermark {
+  display: none;
+}
+
+.visual-card.is-maximized .year-watermark {
+  display: block;
+}
+
+.map-year-watermark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255,255,255,0.18);
+  -webkit-text-stroke: 2px rgba(0,0,0,0.35);
+  font-size: 140px;
+  font-weight: 900;
+  z-index: 900;
+  pointer-events: none;
+  user-select: none;
 }
 </style>
 
@@ -129,9 +360,136 @@ countriesGeo.features.forEach(f => {
   }
 });
 
+const contNames = {
+  GLB: "Global",
+  EUR: "Europe",
+  ASI: "Asia",
+  AFR: "Africa",
+  AME: "Americas",
+  OCE: "Oceania"
+};
+
+const continentCodes = ["EUR", "ASI", "AFR", "AME", "OCE"];
+
+const countriesList = Array.from(
+  d3.rollup(
+    annualData.filter(d => d.Level === "Country"),
+    v => v[0]?.Location_Name,
+    d => d.ISO_Code
+  ),
+  ([iso, name]) => ({
+    iso,
+    name: name || iso,
+    continent: countryToContinent.get(iso)
+  })
+)
+  .filter(d => d.iso && d.continent && d.continent !== "GLB")
+  .sort((a, b) => d3.ascending(a.name, b.name));
+
+const hierarchyPanel = document.createElement("div");
+hierarchyPanel.className = "hierarchy-panel";
+
+function getCountryLayer(countryCode) {
+  let foundLayer = null;
+
+  mapObj.geoLayer.eachLayer(layer => {
+    if (layer.feature.id === countryCode) {
+      foundLayer = layer;
+    }
+  });
+
+  return foundLayer;
+}
+
+function setScope(level, loc) {
+  currentLevel = level;
+  currentLoc = loc;
+
+  if (level === "Global") {
+    mapObj.resetView();
+  } else if (level === "Continent") {
+    mapObj.zoomToContinent(loc);
+  } else if (level === "Country") {
+    const layer = getCountryLayer(loc);
+    if (layer) {
+      mapObj.map.fitBounds(layer.getBounds(), {
+        animate: true,
+        duration: 0.8,
+        padding: [30, 30]
+      });
+    }
+  }
+
+  updateDashboard();
+  updateHierarchyPanel();
+}
+
+function updateHierarchyPanel() {
+  const activeContinent =
+    currentLevel === "Country"
+      ? countryToContinent.get(currentLoc)
+      : currentLevel === "Continent"
+        ? currentLoc
+        : null;
+
+  const visibleCountries = activeContinent
+    ? countriesList.filter(d => d.continent === activeContinent)
+    : countriesList;
+
+  hierarchyPanel.innerHTML = `
+    <div>
+      <div class="hierarchy-title">Hierarchy</div>
+      <div class="hierarchy-subtitle">
+        Current: ${currentLevel === "Global" ? "Global" : currentLevel === "Continent" ? contNames[currentLoc] : countriesList.find(d => d.iso === currentLoc)?.name || currentLoc}
+      </div>
+    </div>
+
+    <div class="hierarchy-section">
+      <button class="hierarchy-button ${currentLevel === "Global" ? "active" : ""}" data-level="Global" data-loc="GLB">
+        Global
+      </button>
+    </div>
+
+    <div class="hierarchy-section">
+      ${continentCodes.map(code => `
+        <button class="hierarchy-button ${currentLoc === code || activeContinent === code ? "active" : ""}" data-level="Continent" data-loc="${code}">
+          ${contNames[code]}
+        </button>
+      `).join("")}
+    </div>
+
+    <div class="hierarchy-section">
+      <select class="hierarchy-select" id="hierarchy-country-select">
+        <option value="">Select country...</option>
+        ${visibleCountries.map(d => `
+          <option value="${d.iso}" ${currentLevel === "Country" && currentLoc === d.iso ? "selected" : ""}>
+            ${d.name}
+          </option>
+        `).join("")}
+      </select>
+    </div>
+  `;
+
+  hierarchyPanel.querySelectorAll(".hierarchy-button").forEach(button => {
+    button.addEventListener("click", () => {
+      setScope(button.dataset.level, button.dataset.loc);
+    });
+  });
+
+  const countrySelect = hierarchyPanel.querySelector("#hierarchy-country-select");
+  if (countrySelect) {
+    countrySelect.addEventListener("change", e => {
+      if (e.target.value) {
+        setScope("Country", e.target.value);
+      }
+    });
+  }
+}
+
 let currentLevel = "Global";
 let currentLoc = "GLB";
 let isPlaying = false;
+let spiralUseAbsolute = false;
 let playTimer = null;
 
 const minIndex = 0;
@@ -152,14 +510,13 @@ scrubberUI.max = maxIndex;
 scrubberUI.step = 1;
 scrubberUI.value = minIndex;
 
-const yearLabel = document.createElement("div");
-yearLabel.className = "timeline-label";
-yearLabel.textContent = "1900";
-
-timelineWrapper.append(playButton, scrubberUI, yearLabel);
+timelineWrapper.append(playButton, scrubberUI);
 
 const spiralContainer = d3.create("svg")
-  .attr("viewBox", "0 0 600 600")
+  .attr("viewBox", "0 0 928 600")
+  .attr("preserveAspectRatio", "xMidYMid meet")
+  .style("width", "100%")
+  .style("height", "100%")
   .style("background-color", "#161b22")
   .node();
 
@@ -208,6 +565,48 @@ function drillUp() {
 
   updateDashboard();
 }
+
+function toggleMaximize(cardId) {
+  const grid = document.querySelector(".dashboard-grid");
+  const cards = document.querySelectorAll(".visual-card");
+  const selectedCard = document.getElementById(cardId);
+
+  if (!grid || !selectedCard) return;
+
+  const alreadyMaximized = selectedCard.classList.contains("is-maximized");
+
+  cards.forEach(card => card.classList.remove("is-maximized"));
+  grid.classList.remove("maximized", "with-hierarchy");
+
+  if (!alreadyMaximized) {
+    selectedCard.classList.add("is-maximized");
+    grid.classList.add("maximized");
+
+    if (cardId !== "map-card") {
+      grid.classList.add("with-hierarchy");
+      updateHierarchyPanel();
+    }
+  }
+
+  setTimeout(() => {
+    if (mapObj?.map) {
+      mapObj.map.invalidateSize(true);
+    }
+
+    updateDashboard();
+  }, 150);
+}
+
+window.toggleMaximize = toggleMaximize;
+
+function toggleSpiralMode() {
+  spiralUseAbsolute = !spiralUseAbsolute;
+  const btn = document.getElementById("spiral-mode-btn");
+  if (btn) btn.textContent = spiralUseAbsolute ? "Anomaly °C" : "Absolute °C";
+  updateDashboard();
+}
+
+window.toggleSpiralMode = toggleSpiralMode;
 
 const mapObj = createMap(countriesGeo, countryToContinent, (countryCode, continentCode, layer) => {
   if (!continentCode || continentCode === "GLB") return;
@@ -260,8 +659,11 @@ const chartObj = createEmissionChart(annualData, countryToContinent, (newLevel, 
 
 function updateDashboard() {
   const {year, month} = getTime();
-  yearLabel.textContent =
-  `${year}-${String(month).padStart(2, "0")}`;
+
+  const mapYearWatermark = document.getElementById("map-year-watermark");
+  if (mapYearWatermark) {
+    mapYearWatermark.textContent = year;
+  }
 
   const globalRow = annualData.find(d => d.Year === year && d.Level === "Global");
   const continentRows = annualData.filter(d => d.Year === year && d.Level === "Continent");
@@ -326,7 +728,14 @@ function updateDashboard() {
       }
     }
 
-    const style = {fillColor, color: strokeColor, weight, fillOpacity, opacity: 0.9};
+    const style = {
+      fillColor,
+      color: strokeColor,
+      weight,
+      fillOpacity,
+      opacity: 0.9
+    };
+
     layer.options.currentDataStyle = style;
     layer.setStyle(style);
   });
@@ -340,28 +749,35 @@ function updateDashboard() {
     GLB: "Global"
   };
 
-  let labelText = "Global Average";
+  let locationName = "Global";
   let valText = "No Data";
 
   if (currentLevel === "Global") {
+    locationName = "Global";
     valText = globalRow ? `${globalRow.Temp_Anomaly.toFixed(2)} °C` : "No Data";
   } else if (currentLevel === "Continent") {
-    labelText = contNames[currentLoc] || currentLoc;
+    locationName = contNames[currentLoc] || currentLoc;
     const val = contMap.get(currentLoc);
     valText = val !== undefined ? `${val.toFixed(2)} °C` : "No Data";
   } else if (currentLevel === "Country") {
-    labelText = nameMap.get(currentLoc) || currentLoc;
+    locationName = nameMap.get(currentLoc) || currentLoc;
     const val = countryMap.get(currentLoc);
     valText = val !== undefined ? `${val.toFixed(2)} °C` : "No Data";
   }
 
+  const mapTitleText = `${locationName} Temperature Anomaly`;
+
   mapObj.dynamicLabel.html(`
-    <div style="font-size: 22px; font-weight: 800; text-shadow: 0 2px 6px rgba(0,0,0,0.9);">${labelText}</div>
-    <div style="font-size: 17px; font-weight: 800; margin-top: 4px; text-shadow: 0 2px 6px rgba(0,0,0,0.9);">${valText}</div>
+    <div style="font-size: 18px; font-weight: 800; text-shadow: 0 2px 6px rgba(0,0,0,0.9);">
+      ${mapTitleText}
+    </div>
+    <div style="font-size: 14px; font-weight: 800; margin-top: 4px; text-shadow: 0 2px 6px rgba(0,0,0,0.9);">
+      ${valText}
+    </div>
   `);
 
   chartObj.update(year, currentLevel, currentLoc);
-  renderSpiral(spiralContainer, monthlyData, year, month, currentLoc, currentLevel);
+  renderSpiral(spiralContainer, monthlyData, year, month, currentLoc, currentLevel, spiralUseAbsolute);
   renderDualAxisChart(dualAxisContainer, annualData, year, currentLevel, currentLoc);
 }
 
@@ -400,20 +816,66 @@ ${timelineWrapper}
 
 <div class="dashboard-grid">
 
-<div class="card map-card">
+<div id="map-card" class="card visual-card map-card">
+<button
+  class="maximize-button"
+  onclick="event.stopPropagation(); event.preventDefault(); window.toggleMaximize('map-card')"
+  onmousedown="event.stopPropagation()"
+  ondblclick="event.stopPropagation()"
+>
+  ⛶
+</button>
+<div id="map-year-watermark" class="year-watermark map-year-watermark"></div>
 ${mapObj.element}
 </div>
 
-<div class="card spiral-card">
+<div id="spiral-card" class="card visual-card spiral-card">
+<button
+  class="maximize-button"
+  onclick="event.stopPropagation(); event.preventDefault(); window.toggleMaximize('spiral-card')"
+  onmousedown="event.stopPropagation()"
+  ondblclick="event.stopPropagation()"
+>
+  ⛶
+</button>
+<button
+  id="spiral-mode-btn"
+  class="spiral-mode-button"
+  onclick="event.stopPropagation(); event.preventDefault(); window.toggleSpiralMode()"
+  onmousedown="event.stopPropagation()"
+  ondblclick="event.stopPropagation()"
+>
+  Absolute °C
+</button>
 ${spiralContainer}
 </div>
 
-<div class="card dual-card">
+<div id="dual-card" class="card visual-card dual-card">
+<button
+  class="maximize-button"
+  onclick="event.stopPropagation(); event.preventDefault(); window.toggleMaximize('dual-card')"
+  onmousedown="event.stopPropagation()"
+  ondblclick="event.stopPropagation()"
+>
+  ⛶
+</button>
 ${dualAxisContainer}
 </div>
 
-<div class="card emission-card">
+<div id="emission-card" class="card visual-card emission-card">
+<button
+  class="maximize-button"
+  onclick="event.stopPropagation(); event.preventDefault(); window.toggleMaximize('emission-card')"
+  onmousedown="event.stopPropagation()"
+  ondblclick="event.stopPropagation()"
+>
+  ⛶
+</button>
 ${chartObj.element}
+</div>
+
+<div id="hierarchy-card" class="card hierarchy-card">
+${hierarchyPanel}
 </div>
 
 </div>
