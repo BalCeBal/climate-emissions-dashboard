@@ -792,6 +792,23 @@ function toggleMaximize(cardId) {
       grid.classList.add("with-hierarchy");
       updateHierarchyPanel();
     }
+
+    // Scroll down when a visual is maximized
+    setTimeout(() => {
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: "smooth"
+      });
+    }, 120);
+
+  } else {
+    // Scroll back up when maximized visual is minimized
+    setTimeout(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+    }, 120);
   }
 
   setTimeout(() => {
@@ -800,7 +817,7 @@ function toggleMaximize(cardId) {
     }
 
     updateDashboard();
-  }, 150);
+  }, 180);
 }
 
 window.toggleMaximize = toggleMaximize;
