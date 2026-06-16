@@ -39,6 +39,23 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
     .style("color", "#ffffff")
     .style("font-family", "consolas");
 
+  const hoverCountryLabel = d3.select(container).append("div")
+    .attr("class", "hover-country-label")
+    .style("position", "absolute")
+    .style("top", "92px")
+    .style("left", "50%")
+    .style("transform", "translateX(-50%)")
+    .style("z-index", "1000")
+    .style("pointer-events", "none")
+    .style("text-align", "center")
+    .style("color", "#ffffff")
+    .style("font-family", "consolas")
+    .style("font-size", "18px")
+    .style("font-weight", "800")
+    .style("opacity", 0)
+    .style("transition", "opacity 120ms ease")
+    .style("text-shadow", "0 2px 6px rgba(0,0,0,0.9)");
+
   const manual = d3.select(container).append("div")
     .style("position", "absolute")
     .style("top", "2%")
@@ -193,6 +210,21 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
           });
 
           if (layer.bringToFront) layer.bringToFront();
+
+          const countryName =
+            feature.properties?.name ||
+            feature.properties?.NAME ||
+            feature.properties?.admin ||
+            feature.properties?.name_long ||
+            feature.id;
+
+          hoverCountryLabel
+            .style("opacity", 1)
+            .html(`
+      <div style="font-size: 18px; font-weight: 800; text-shadow: 0 2px 6px rgba(0,0,0,0.9);">
+        ${countryName}
+      </div>
+    `);
         },
 
         mouseout: () => {
@@ -205,6 +237,10 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
               fillOpacity: 0.4
             }
           );
+
+          hoverCountryLabel
+            .style("opacity", 0)
+            .html("");
         },
 
         click: e => {
