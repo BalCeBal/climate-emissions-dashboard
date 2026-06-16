@@ -47,7 +47,7 @@ h1 {
 
 /* ── Timeline ── */
 .dashboard-slider {
-  padding: 1rem;
+  padding: 0.6rem 1rem 0.25rem 1rem;
 }
 
 .timeline-control {
@@ -81,6 +81,97 @@ h1 {
   text-align: right;
   font-family: consolas, monospace;
   font-weight: 800;
+}
+
+.timeline-track-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 70px;
+  display: flex;
+  align-items: center;
+}
+
+.timeline-range {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+}
+
+.timeline-markers {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 70px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.timeline-marker {
+  position: absolute;
+  top: 13px;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  pointer-events: auto;
+  padding: 0;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
+}
+
+.timeline-marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  width: 2px;
+  height: 18px;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.timeline-marker.conflict,
+.timeline-marker.climate {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.timeline-marker-label {
+  position: absolute;
+  left: 50%;
+  top: 34px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.timeline-marker-event {
+  color: rgba(255, 255, 255, 0.9);
+  font-family: consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+}
+
+.timeline-marker-year {
+  color: rgba(255, 255, 255, 0.65);
+  font-family: consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+}
+
+.timeline-marker:hover .timeline-marker-label {
+  opacity: 1;
 }
 
 /* ── Dashboard grid ── */
@@ -503,6 +594,73 @@ let playTimer = null;
 const minIndex = 0;
 const maxIndex = (2013 - 1900) * 12 + 11;
 
+function dateToTimeIndex(year, month = 1) {
+  return (year - 1900) * 12 + (month - 1);
+}
+
+function timeIndexToPercent(index) {
+  return ((index - minIndex) / (maxIndex - minIndex)) * 100;
+}
+
+const historicalEvents = [
+  {
+    label: "WWI Begins",
+    year: 1914,
+    month: 7,
+    type: "conflict",
+    description: "World War I begins"
+  },
+  {
+    label: "WWI End",
+    year: 1918,
+    month: 11,
+    type: "conflict",
+    description: "World War I ends"
+  },
+  {
+    label: "Great Depression",
+    year: 1929,
+    month: 10,
+    type: "conflict",
+    description: "The Great Depression started after the 1929 stock market crash."
+  },
+  {
+    label: "WWII Begins",
+    year: 1939,
+    month: 9,
+    type: "conflict",
+    description: "World War II begins"
+  },
+  {
+    label: "WWII End",
+    year: 1945,
+    month: 9,
+    type: "conflict",
+    description: "World War II ends"
+  },
+  {
+    label: "Post-war Boom",
+    year: 1950,
+    month: 1,
+    type: "conflict",
+    description: "The post-war economic boom increased industrial production."
+  },
+  {
+    label: "IPCC",
+    year: 1988,
+    month: 11,
+    type: "climate",
+    description: "The Intergovernmental Panel on Climate Change was established."
+  },
+  {
+    label: "Kyoto Protocol",
+    year: 1997,
+    month: 12,
+    type: "climate",
+    description: "Kyoto Protocol adopted."
+  }
+];
+
 const timelineWrapper = document.createElement("div");
 timelineWrapper.className = "timeline-control";
 
@@ -518,7 +676,47 @@ scrubberUI.max = maxIndex;
 scrubberUI.step = 1;
 scrubberUI.value = minIndex;
 
-timelineWrapper.append(playButton, scrubberUI);
+const timelineTrackWrap = document.createElement("div");
+timelineTrackWrap.className = "timeline-track-wrap";
+
+const timelineMarkers = document.createElement("div");
+timelineMarkers.className = "timeline-markers";
+
+timelineTrackWrap.append(scrubberUI, timelineMarkers);
+timelineWrapper.append(playButton, timelineTrackWrap);
+
+function renderTimelineMarkers() {
+  timelineMarkers.innerHTML = "";
+
+  historicalEvents.forEach(event => {
+    const index = dateToTimeIndex(event.year, event.month);
+
+    // Skip events outside the current data range, e.g. Paris Agreement if data ends in 2013
+    if (index < minIndex || index > maxIndex) return;
+
+    const marker = document.createElement("button");
+    marker.className = `timeline-marker ${event.type}`;
+    marker.style.left = `${timeIndexToPercent(index)}%`;
+    marker.title = `${event.label} (${event.year}): ${event.description}`;
+
+    marker.innerHTML = `
+      <span class="timeline-marker-label">
+        <span class="timeline-marker-event">${event.label}</span>
+        <span class="timeline-marker-year">${event.year}</span>
+      </span>
+    `;
+
+    marker.addEventListener("click", eventClick => {
+      eventClick.stopPropagation();
+      scrubberUI.value = index;
+      updateDashboard();
+    });
+
+    timelineMarkers.append(marker);
+  });
+}
+
+renderTimelineMarkers();
 
 const spiralContainer = d3.create("svg")
   .attr("viewBox", "0 0 928 600")
