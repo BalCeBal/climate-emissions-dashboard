@@ -42,19 +42,18 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
   const hoverCountryLabel = d3.select(container).append("div")
     .attr("class", "hover-country-label")
     .style("position", "absolute")
-    .style("top", "92px")
-    .style("left", "50%")
-    .style("transform", "translateX(-50%)")
-    .style("z-index", "1000")
+    .style("z-index", "1100")
     .style("pointer-events", "none")
-    .style("text-align", "center")
+    .style("opacity", 0)
+    .style("padding", "4px 8px")
+    .style("border-radius", "6px")
     .style("color", "#ffffff")
     .style("font-family", "consolas")
-    .style("font-size", "18px")
+    .style("font-size", "16px")
     .style("font-weight", "800")
-    .style("opacity", 0)
-    .style("transition", "opacity 120ms ease")
-    .style("text-shadow", "0 2px 6px rgba(0,0,0,0.9)");
+    .style("white-space", "nowrap")
+    .style("text-shadow", "0 2px 6px rgba(0,0,0,0.9)")
+    .style("transition", "opacity 120ms ease");
 
   const manual = d3.select(container).append("div")
     .style("position", "absolute")
@@ -202,7 +201,7 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
 
     onEachFeature(feature, layer) {
       layer.on({
-        mouseover: () => {
+        mouseover: e => {
           layer.setStyle({
             weight: 2,
             color: "#ffffff",
@@ -220,11 +219,43 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
 
           hoverCountryLabel
             .style("opacity", 1)
-            .html(`
-      <div style="font-size: 18px; font-weight: 800; text-shadow: 0 2px 6px rgba(0,0,0,0.9);">
-        ${countryName}
-      </div>
-    `);
+            .text(countryName);
+        },
+
+        mousemove: e => {
+          const countryName =
+            feature.properties?.name ||
+            feature.properties?.NAME ||
+            feature.properties?.admin ||
+            feature.properties?.name_long ||
+            feature.id;
+
+          const p = map.mouseEventToContainerPoint(e.originalEvent);
+
+          hoverCountryLabel.text(countryName);
+
+          const labelNode = hoverCountryLabel.node();
+          const labelWidth = labelNode ? labelNode.offsetWidth : 100;
+          const labelHeight = labelNode ? labelNode.offsetHeight : 24;
+
+          const containerWidth = container.clientWidth;
+          const containerHeight = container.clientHeight;
+
+          let left = p.x + 14;
+          let top = p.y + 8;
+
+          if (left + labelWidth > containerWidth - 8) {
+            left = p.x - labelWidth - 14;
+          }
+
+          if (top + labelHeight > containerHeight - 8) {
+            top = p.y - labelHeight - 8;
+          }
+
+          hoverCountryLabel
+            .style("opacity", 1)
+            .style("left", `${left}px`)
+            .style("top", `${top}px`);
         },
 
         mouseout: () => {
@@ -240,15 +271,11 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
 
           hoverCountryLabel
             .style("opacity", 0)
-            .html("");
+            .text("");
         },
 
         click: e => {
-          if (e.originalEvent) {
-            e.originalEvent.__countryClick = true;
-            L.DomEvent.stop(e.originalEvent);
-          }
-
+          L.DomEvent.stopPropagation(e.originalEvent);
           onLocationChange(
             feature.id,
             countryToContinent.get(feature.id),
