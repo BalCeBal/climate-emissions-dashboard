@@ -122,7 +122,7 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange, on
   d3.range(0, 1.1, 0.1).forEach(t => {
     gradient.append("stop")
       .attr("offset", `${t * 100}%`)
-      .attr("stop-color", d3.interpolateRdYlBu(t));
+      .attr("stop-color", d3.interpolateRdYlBu(1 - t));
   });
 
   legSvg.append("text")
@@ -154,7 +154,7 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange, on
     .attr("font-weight", "700")
     .attr("fill", "#cbd5e1")
     .style("font-family", "consolas")
-    .text("+2°C")
+    .text("-2°C")
     .style("paint-order", "stroke")
     .style("stroke", "#000000")
     .style("stroke-width", "2px")
@@ -182,7 +182,7 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange, on
     .attr("fill", "#cbd5e1")
     .attr("text-anchor", "end")
     .style("font-family", "consolas")
-    .text("-2°C")
+    .text("+2°C")
     .style("paint-order", "stroke")
     .style("stroke", "#000000")
     .style("stroke-width", "2px")
