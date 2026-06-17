@@ -1,13 +1,27 @@
 // src/components/charts.js
 import * as d3 from "d3";
 
-export function createEmissionChart(annualData, countryToContinent, onNavigate) {
+export function createEmissionChart(annualData, countryToContinent, onNavigate, onHover = () => { }, onHoverEnd = () => { }) {
   const width = 928;
   const height = 500;
-  const margin = {top: 60, right: 120, bottom: 50, left: 60};
+  const margin = { top: 60, right: 120, bottom: 50, left: 60 };
 
   let currentLevel = "Global";
   let currentLoc = "GLB";
+
+  let latestGroupedData = [];
+  let latestTop5 = new Set();
+  let latestIsMaximized = false;
+  let focusedCode = null;
+
+  const contNames = {
+    EUR: "Europe",
+    ASI: "Asia",
+    AFR: "Africa",
+    AME: "Americas",
+    OCE: "Oceania",
+    GLB: "Global"
+  };
 
   const xScale = d3.scaleLinear().range([margin.left, width - margin.right]);
   const yScale = d3.scaleLinear().domain([-1.5, 2.5]).range([height - margin.bottom, margin.top]);
@@ -47,7 +61,7 @@ export function createEmissionChart(annualData, countryToContinent, onNavigate) 
     .style("stroke-width", 2)
     .text("");
 
-  const xAxis = d3.axisBottom(xScale).ticks(8).tickFormat(d => d >= 1000 ? (d/1000) + "K" : d).tickSize(-height + margin.top + margin.bottom);
+  const xAxis = d3.axisBottom(xScale).ticks(8).tickFormat(d => d >= 1000 ? (d / 1000) + "K" : d).tickSize(-height + margin.top + margin.bottom);
   const yAxis = d3.axisLeft(yScale).ticks(6).tickFormat(d => d > 0 ? `+${d}` : d).tickSize(-width + margin.left + margin.right);
 
   const xAxisG = svg.append("g").attr("class", "chart-axis x-axis").attr("transform", `translate(0, ${height - margin.bottom})`);
@@ -58,17 +72,129 @@ export function createEmissionChart(annualData, countryToContinent, onNavigate) 
 
   svg.append("g").attr("id", "comet-trails").attr("clip-path", "url(#chart-clip)");
   svg.append("g").attr("id", "comet-dots").attr("clip-path", "url(#chart-clip)");
+  svg.append("g").attr("id", "comet-hit-area").attr("clip-path", "url(#chart-clip)");
   svg.append("g").attr("id", "comet-labels").attr("clip-path", "url(#chart-clip)");
 
   // Hover label — single reusable text element shown on mouseover of non-top5 dots
   const hoverLabel = svg.append("text")
     .attr("id", "hover-label")
-    .attr("fill", "#f8fafc")
-    .attr("font-size", "13px")
-    .attr("font-weight", "bold")
-    .attr("filter", "drop-shadow(0px 2px 2px rgba(0,0,0,0.8))")
+    .attr("fill", "#ffffff")
+    .attr("font-size", "14px")
+    .attr("font-weight", "800")
     .attr("opacity", 0)
-    .attr("pointer-events", "none");
+    .attr("pointer-events", "none")
+    .style("font-family", "consolas")
+    .style("paint-order", "stroke")
+    .style("stroke", "#000000")
+    .style("stroke-width", "3px")
+    .style("stroke-linejoin", "round");
+
+  function getPointName(d) {
+    const last = d[1][d[1].length - 1];
+
+    if (currentLevel === "Global") {
+      return contNames[d[0]] || d[0];
+    }
+
+    return last.Location_Name || d[0];
+  }
+
+  function baseDotRadius() {
+    return currentLevel === "Global" ? 8 : currentLevel === "Continent" ? 4 : 6;
+  }
+
+  function dotRadius(code) {
+    return code === focusedCode ? baseDotRadius() + 4 : baseDotRadius();
+  }
+
+  function dotStrokeWidth(code) {
+    return code === focusedCode
+      ? 3
+      : currentLevel === "Continent"
+        ? 0.8
+        : 1.2;
+  }
+
+  function shouldShowHoverLabel(code) {
+    // In minimized Continent mode, top-5 labels are already visible,
+    // so hover labels should only appear for non-top5 countries.
+    return (
+      currentLevel === "Continent" &&
+      !latestIsMaximized &&
+      !latestTop5.has(code)
+    );
+  }
+
+  function positionHoverLabel(d, event = null) {
+    if (!d || !shouldShowHoverLabel(d[0])) {
+      hoverLabel.attr("opacity", 0).text("");
+      return;
+    }
+
+    const last = d[1][d[1].length - 1];
+
+    let x;
+    let y;
+
+    if (event) {
+      const p = d3.pointer(event, svg.node());
+      x = p[0] + 14;
+      y = p[1] - 10;
+    } else {
+      x = xScale(last.Emissions_MtCO2) + 14;
+      y = yScale(last.Temp_Anomaly) - 10;
+    }
+
+    x = Math.min(x, width - margin.right - 10);
+    y = Math.max(y, margin.top + 12);
+
+    hoverLabel
+      .attr("x", x)
+      .attr("y", y)
+      .attr("opacity", 1)
+      .text(getPointName(d))
+      .raise();
+  }
+
+  function focusPoint(code) {
+    focusedCode = code;
+
+    const target = latestGroupedData.find(d => d[0] === code);
+    if (!target) return;
+
+    svg.select("#comet-dots")
+      .selectAll("circle")
+      .attr("r", d => dotRadius(d[0]))
+      .attr("stroke", "#ffffff")
+      .attr("stroke-width", d => dotStrokeWidth(d[0]))
+      .attr("opacity", d =>
+        currentLevel === "Country" && d[0] !== currentLoc ? 0.0 : 1.0
+      );
+
+    svg.select("#comet-dots")
+      .selectAll("circle")
+      .filter(d => d[0] === code)
+      .raise();
+
+    positionHoverLabel(target);
+  }
+
+  function clearPointFocus() {
+    focusedCode = null;
+
+    svg.select("#comet-dots")
+      .selectAll("circle")
+      .attr("r", d => dotRadius(d[0]))
+      .attr("stroke", "#ffffff")
+      .attr("stroke-width", d => dotStrokeWidth(d[0]))
+      .attr("opacity", d =>
+        currentLevel === "Country" && d[0] !== currentLoc ? 0.0 : 1.0
+      );
+
+    hoverLabel
+      .attr("opacity", 0)
+      .text("");
+  }
 
   // Safe Right-Click Drill Up
   svg.on("contextmenu", (e) => {
@@ -104,7 +230,6 @@ export function createEmissionChart(annualData, countryToContinent, onNavigate) 
 
     const colorScale = d3.scaleSequential([2, -2], d3.interpolateRdYlBu);
     const lineGen = d3.line().x(d => xScale(d.Emissions_MtCO2)).y(d => yScale(d.Temp_Anomaly)).curve(d3.curveCatmullRom.alpha(0.5));
-    const contNames = { "EUR": "Europe", "ASI": "Asia", "AFR": "Africa", "AME": "Americas", "OCE": "Oceania" };
 
     const currentScopeName =
       level === "Global"
@@ -146,44 +271,74 @@ export function createEmissionChart(annualData, countryToContinent, onNavigate) 
     const isMaximized = document.getElementById("emission-card")?.classList.contains("is-maximized") ?? false;
     const top5 = new Set(
       [...groupedData]
-        .sort((a, b) => (b[1][b[1].length-1].Emissions_MtCO2 ?? 0) - (a[1][a[1].length-1].Emissions_MtCO2 ?? 0))
+        .sort((a, b) => (b[1][b[1].length - 1].Emissions_MtCO2 ?? 0) - (a[1][a[1].length - 1].Emissions_MtCO2 ?? 0))
         .slice(0, 5)
         .map(d => d[0])
     );
 
-    svg.select("#comet-dots").selectAll("circle").data(groupedData, d => d[0])
+    latestGroupedData = groupedData;
+    latestTop5 = top5;
+    latestIsMaximized = isMaximized;
+
+    // Visible scatterplot dots
+    svg.select("#comet-dots")
+      .selectAll("circle")
+      .data(groupedData, d => d[0])
       .join(
-        enter => enter.append("circle").attr("class", "comet-dot")
+        enter => enter.append("circle")
+          .attr("class", "comet-dot")
           .attr("cx", d => xScale(d[1][d[1].length - 1].Emissions_MtCO2))
           .attr("cy", d => yScale(d[1][d[1].length - 1].Temp_Anomaly)),
         update => update.call(u => u.transition(t)
           .attr("cx", d => xScale(d[1][d[1].length - 1].Emissions_MtCO2))
           .attr("cy", d => yScale(d[1][d[1].length - 1].Temp_Anomaly)))
       )
-      .attr("r", d => level === "Global" ? 8 : level === "Continent" ? 4 : 6)
+      .attr("r", d => dotRadius(d[0]))
       .attr("fill", d => colorScale(d[1][d[1].length - 1].Temp_Anomaly))
       .attr("stroke", "#ffffff")
-      .attr("stroke-width", d => level === "Continent" ? 0.8 : 1.2)
+      .attr("stroke-width", d => dotStrokeWidth(d[0]))
       .attr("opacity", d => (level === "Country" && d[0] !== loc) ? 0.0 : 1.0)
+      .style("pointer-events", "none");
+
+    // Invisible larger hit area for easier hover/click
+    svg.select("#comet-hit-area")
+      .selectAll("circle")
+      .data(groupedData, d => d[0])
+      .join("circle")
+      .attr("cx", d => xScale(d[1][d[1].length - 1].Emissions_MtCO2))
+      .attr("cy", d => yScale(d[1][d[1].length - 1].Temp_Anomaly))
+      .attr("r", 12)
+      .attr("fill", "transparent")
+      .style("cursor", "pointer")
+      .on("mouseover", function (e, d) {
+        focusedCode = d[0];
+
+        focusPoint(d[0]);
+        positionHoverLabel(d, e);
+
+        // Scatterplot hover -> map focus
+        onHover(d[0]);
+      })
+      .on("mousemove", function (e, d) {
+        positionHoverLabel(d, e);
+      })
+      .on("mouseout", function (e, d) {
+        clearPointFocus();
+
+        // Scatterplot hover end -> map focus clear
+        onHoverEnd(d[0]);
+      })
       .on("click", (e, d) => {
         const clickedLoc = d[0];
-        if (level === "Global") onNavigate("Continent", clickedLoc);
-        else if (level === "Continent" || (level === "Country" && clickedLoc !== loc)) onNavigate("Country", clickedLoc);
-      })
-      .on("mouseover", function(e, d) {
-        // In minimized mode, show hover label for non-top5 dots
-        if (level === "Continent" && !isMaximized && !top5.has(d[0])) {
-          const last = d[1][d[1].length - 1];
-          const name = level === "Global" ? (contNames[d[0]] || d[0]) : last.Location_Name;
-          hoverLabel
-            .attr("x", xScale(last.Emissions_MtCO2) + 14)
-            .attr("y", yScale(last.Temp_Anomaly) + 4)
-            .attr("opacity", 1)
-            .text(name);
+
+        if (currentLevel === "Global") {
+          onNavigate("Continent", clickedLoc);
+        } else if (
+          currentLevel === "Continent" ||
+          (currentLevel === "Country" && clickedLoc !== currentLoc)
+        ) {
+          onNavigate("Country", clickedLoc);
         }
-      })
-      .on("mouseout", function() {
-        hoverLabel.attr("opacity", 0).text("");
       });
 
     svg.select("#comet-labels").selectAll("text").data(groupedData, d => d[0])
@@ -209,17 +364,30 @@ export function createEmissionChart(annualData, countryToContinent, onNavigate) 
       })
       .text(d => level === "Global" ? (contNames[d[0]] || d[0]) : d[1][d[1].length - 1].Location_Name);
 
+    if (focusedCode) {
+      const target = latestGroupedData.find(d => d[0] === focusedCode);
+
+      if (target) {
+        svg.select("#comet-dots")
+          .selectAll("circle")
+          .attr("r", d => dotRadius(d[0]))
+          .attr("stroke-width", d => dotStrokeWidth(d[0]));
+
+        positionHoverLabel(target);
+      }
+    }
+
     // Keep hover label on top
     hoverLabel.raise();
   }
 
-  return { element: svg.node(), update };
+  return { element: svg.node(), update, focusPoint, clearPointFocus };
 }
 
 export function renderDualAxisChart(svgElement, annualData, currentYear, level, loc) {
   const width = 928;
   const height = 350;
-  const margin = {top: 60, right: 80, bottom: 40, left: 80};
+  const margin = { top: 60, right: 80, bottom: 40, left: 80 };
 
   const svg = d3.select(svgElement);
   svg.style("font-family", "consolas");
@@ -260,20 +428,20 @@ export function renderDualAxisChart(svgElement, annualData, currentYear, level, 
     .call(g => g.selectAll(".tick line").attr("stroke", "#334155").attr("stroke-dasharray", "3,3"))
     .call(g => g.selectAll(".tick text").attr("fill", "#94a3b8").attr("font-size", "12px"));
 
-  svg.append("g").attr("transform", `translate(${margin.left}, 0)`).call(d3.axisLeft(yEmissionScale).ticks(5).tickFormat(d => d >= 1000 ? (d/1000).toFixed(1) + "K" : d))
+  svg.append("g").attr("transform", `translate(${margin.left}, 0)`).call(d3.axisLeft(yEmissionScale).ticks(5).tickFormat(d => d >= 1000 ? (d / 1000).toFixed(1) + "K" : d))
     .call(g => g.select(".domain").remove())
     .call(g => g.selectAll(".tick text").attr("fill", "#94a3b8").attr("font-size", "12px"));
-  svg.append("text").attr("transform", "rotate(-90)").attr("x", -height/2).attr("y", 25).attr("fill", "#94a3b8").attr("font-size", "13px").attr("font-weight", "bold").attr("text-anchor", "middle").text("Sum of Emission (MtCO2)");
+  svg.append("text").attr("transform", "rotate(-90)").attr("x", -height / 2).attr("y", 25).attr("fill", "#94a3b8").attr("font-size", "13px").attr("font-weight", "bold").attr("text-anchor", "middle").text("Sum of Emission (MtCO2)");
 
   svg.append("g").attr("transform", `translate(${width - margin.right}, 0)`).call(d3.axisRight(yTempScale).ticks(5).tickFormat(d => d > 0 ? `+${d}` : d))
     .call(g => g.select(".domain").remove())
     .call(g => g.selectAll(".tick text").attr("fill", "#e2737a").attr("font-size", "12px"));
-  svg.append("text").attr("transform", "rotate(-90)").attr("x", -height/2).attr("y", width - 20).attr("fill", "#e2737a").attr("font-size", "13px").attr("font-weight", "bold").attr("text-anchor", "middle").text("Temperature Anomaly (°C)");
+  svg.append("text").attr("transform", "rotate(-90)").attr("x", -height / 2).attr("y", width - 20).attr("fill", "#e2737a").attr("font-size", "13px").attr("font-weight", "bold").attr("text-anchor", "middle").text("Temperature Anomaly (°C)");
 
   const barWidth = Math.max(2, (width - margin.left - margin.right) / 114 - 1.5);
 
-  svg.append("g").selectAll("rect").data(chartData).join("rect").attr("x", d => xScale(d.Year) - barWidth/2).attr("y", d => yEmissionScale(d.Emissions_MtCO2)).attr("width", barWidth).attr("height", d => height - margin.bottom - yEmissionScale(d.Emissions_MtCO2)).attr("fill", "#334155").attr("opacity", 0.15);
-  svg.append("g").selectAll("rect").data(pastData).join("rect").attr("x", d => xScale(d.Year) - barWidth/2).attr("y", d => yEmissionScale(d.Emissions_MtCO2)).attr("width", barWidth).attr("height", d => height - margin.bottom - yEmissionScale(d.Emissions_MtCO2)).attr("fill", "#475569").attr("opacity", d => d.Year === currentYear ? 1.0 : 0.7);
+  svg.append("g").selectAll("rect").data(chartData).join("rect").attr("x", d => xScale(d.Year) - barWidth / 2).attr("y", d => yEmissionScale(d.Emissions_MtCO2)).attr("width", barWidth).attr("height", d => height - margin.bottom - yEmissionScale(d.Emissions_MtCO2)).attr("fill", "#334155").attr("opacity", 0.15);
+  svg.append("g").selectAll("rect").data(pastData).join("rect").attr("x", d => xScale(d.Year) - barWidth / 2).attr("y", d => yEmissionScale(d.Emissions_MtCO2)).attr("width", barWidth).attr("height", d => height - margin.bottom - yEmissionScale(d.Emissions_MtCO2)).attr("fill", "#475569").attr("opacity", d => d.Year === currentYear ? 1.0 : 0.7);
 
   const lineGen = d3.line().x(d => xScale(d.Year)).y(d => yTempScale(d.Temp_Anomaly)).curve(d3.curveMonotoneX);
   svg.append("path").datum(chartData).attr("fill", "none").attr("stroke", "#e2737a").attr("stroke-width", 2).attr("opacity", 0.15).attr("d", lineGen);

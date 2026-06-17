@@ -830,32 +830,52 @@ function toggleSpiralMode() {
 }
 
 window.toggleSpiralMode = toggleSpiralMode;
+let chartObj;
 
-const mapObj = createMap(countriesGeo, countryToContinent, (countryCode, continentCode, layer) => {
-  if (!continentCode || continentCode === "GLB") return;
+const mapObj = createMap(
+  countriesGeo,
+  countryToContinent,
+  (countryCode, continentCode, layer) => {
+    if (!continentCode || continentCode === "GLB") return;
 
-  if (currentLevel === "Global") {
-    drillToContinent(continentCode);
-  } else if (currentLevel === "Continent") {
-    if (continentCode === currentLoc) {
-      drillToCountry(countryCode, layer);
-    } else {
+    if (currentLevel === "Global") {
       drillToContinent(continentCode);
-    }
-  } else if (currentLevel === "Country") {
-    const activeContinent = countryToContinent.get(currentLoc);
+    } else if (currentLevel === "Continent") {
+      if (continentCode === currentLoc) {
+        drillToCountry(countryCode, layer);
+      } else {
+        drillToContinent(continentCode);
+      }
+    } else if (currentLevel === "Country") {
+      const activeContinent = countryToContinent.get(currentLoc);
 
-    if (continentCode === activeContinent) {
-      countryCode === currentLoc
-        ? drillToContinent(activeContinent)
-        : drillToCountry(countryCode, layer);
-    } else {
-      drillToContinent(continentCode);
+      if (continentCode === activeContinent) {
+        countryCode === currentLoc
+          ? drillToContinent(activeContinent)
+          : drillToCountry(countryCode, layer);
+      } else {
+        drillToContinent(continentCode);
+      }
     }
+
+    updateDashboard();
+  },
+
+  // Map hover → scatterplot focus
+  (countryCode, continentCode) => {
+    const scatterCode =
+      currentLevel === "Global"
+        ? continentCode
+        : countryCode;
+
+    chartObj?.focusPoint(scatterCode);
+  },
+
+  // Map hover end → clear scatterplot focus
+  () => {
+    chartObj?.clearPointFocus();
   }
-
-  updateDashboard();
-});
+);
 
 mapObj.map.on("click", e => {
   if (e.originalEvent?.__countryClick) return;
@@ -867,18 +887,32 @@ mapObj.map.on("contextmenu", e => {
   drillUp();
 });
 
-const chartObj = createEmissionChart(annualData, countryToContinent, (newLevel, newLoc) => {
-  currentLevel = newLevel;
-  currentLoc = newLoc;
+chartObj = createEmissionChart(
+  annualData,
+  countryToContinent,
+  (newLevel, newLoc) => {
+    currentLevel = newLevel;
+    currentLoc = newLoc;
 
-  if (newLevel === "Global") {
-    mapObj.resetView();
-  } else if (newLevel === "Continent") {
-    mapObj.zoomToContinent(newLoc);
+    if (newLevel === "Global") {
+      mapObj.resetView();
+    } else if (newLevel === "Continent") {
+      mapObj.zoomToContinent(newLoc);
+    }
+
+    updateDashboard();
+  },
+
+  // Scatterplot hover → map focus
+  code => {
+    mapObj.focusLocation(code);
+  },
+
+  // Scatterplot hover end → clear map focus
+  () => {
+    mapObj.clearFocusLocation();
   }
-
-  updateDashboard();
-});
+);
 
 function updateDashboard() {
   const {year, month} = getTime();

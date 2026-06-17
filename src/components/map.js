@@ -2,7 +2,7 @@
 import * as d3 from "d3";
 import L from "leaflet";
 
-export function createMap(countriesGeo, countryToContinent, onLocationChange) {
+export function createMap(countriesGeo, countryToContinent, onLocationChange, onCountryHover = () => { }, onCountryHoverEnd = () => { }) {
   const container = d3.create("div")
     .attr("class", "leaflet-map-container")
     .style("width", "100%")
@@ -200,36 +200,32 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
     },
 
     onEachFeature(feature, layer) {
+      const getCountryName = () =>
+        feature.properties?.name ||
+        feature.properties?.NAME ||
+        feature.properties?.admin ||
+        feature.properties?.name_long ||
+        feature.id;
+
       layer.on({
         mouseover: e => {
-          layer.setStyle({
-            weight: 2,
-            color: "#ffffff",
-            opacity: 1
-          });
+          const countryCode = feature.id;
+          const continentCode = countryToContinent.get(countryCode);
 
-          if (layer.bringToFront) layer.bringToFront();
+          // Map hover focus
+          focusLocation(countryCode);
 
-          const countryName =
-            feature.properties?.name ||
-            feature.properties?.NAME ||
-            feature.properties?.admin ||
-            feature.properties?.name_long ||
-            feature.id;
+          // Cross-hover: map -> scatterplot
+          onCountryHover(countryCode, continentCode);
 
+          // Show cursor label
           hoverCountryLabel
             .style("opacity", 1)
-            .text(countryName);
+            .text(getCountryName());
         },
 
         mousemove: e => {
-          const countryName =
-            feature.properties?.name ||
-            feature.properties?.NAME ||
-            feature.properties?.admin ||
-            feature.properties?.name_long ||
-            feature.id;
-
+          const countryName = getCountryName();
           const p = map.mouseEventToContainerPoint(e.originalEvent);
 
           hoverCountryLabel.text(countryName);
@@ -259,23 +255,27 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
         },
 
         mouseout: () => {
-          layer.setStyle(
-            layer.options.currentDataStyle || {
-              fillColor: "#1e293b",
-              color: "#94a3b8",
-              weight: 0.4,
-              opacity: 0.9,
-              fillOpacity: 0.4
-            }
-          );
+          const countryCode = feature.id;
+          const continentCode = countryToContinent.get(countryCode);
 
+          // Remove temporary map hover focus
+          clearFocusLocation();
+
+          // Cross-hover end: map -> scatterplot
+          onCountryHoverEnd(countryCode, continentCode);
+
+          // Hide cursor label
           hoverCountryLabel
             .style("opacity", 0)
             .text("");
         },
 
         click: e => {
-          L.DomEvent.stopPropagation(e.originalEvent);
+          if (e.originalEvent) {
+            e.originalEvent.__countryClick = true;
+            L.DomEvent.stop(e.originalEvent);
+          }
+
           onLocationChange(
             feature.id,
             countryToContinent.get(feature.id),
@@ -315,12 +315,56 @@ export function createMap(countriesGeo, countryToContinent, onLocationChange) {
   setTimeout(resetView, 100);
   setTimeout(resetView, 500);
 
+  let focusedLayers = [];
+
+  function focusLocation(code) {
+    clearFocusLocation();
+
+    geoLayer.eachLayer(layer => {
+      const countryCode = layer.feature.id;
+      const continentCode = countryToContinent.get(countryCode);
+
+      const isCountryMatch = countryCode === code;
+      const isContinentMatch = continentCode === code;
+
+      if (isCountryMatch || isContinentMatch) {
+        layer.setStyle({
+          weight: isCountryMatch ? 2.4 : 1.4,
+          color: "#ffffff",
+          opacity: 1
+        });
+
+        if (layer.bringToFront) layer.bringToFront();
+
+        focusedLayers.push(layer);
+      }
+    });
+  }
+
+  function clearFocusLocation() {
+    focusedLayers.forEach(layer => {
+      layer.setStyle(
+        layer.options.currentDataStyle || {
+          fillColor: "#1e293b",
+          color: "#94a3b8",
+          weight: 0.4,
+          opacity: 0.9,
+          fillOpacity: 0.4
+        }
+      );
+    });
+
+    focusedLayers = [];
+  }
+
   return {
     element: container,
     map,
     geoLayer,
     dynamicLabel,
     zoomToContinent,
-    resetView
+    resetView,
+    focusLocation,
+    clearFocusLocation
   };
 }
